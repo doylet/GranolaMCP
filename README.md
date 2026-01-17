@@ -169,7 +169,7 @@ python -m granola_mcp list --last 7d
 python -m granola_mcp list --folder Mozilla --limit 10
 
 # Filter by folder name containing keyword(s)
-python -m granola_mcp list --folder-contains "Atlassian" --limit 10
+python -m granola_mcp list --folder-contains "Personal" --limit 10
 
 # Filter by folder name containing multiple keywords (comma-separated; all must match)
 python -m granola_mcp list --folder-contains "engineering,planning" --limit 10
@@ -328,7 +328,7 @@ The server provides 10 comprehensive tools:
 5. **get_transcript** - Full transcript with speaker identification
 6. **get_meeting_notes** - Structured AI summaries and human notes
 7. **list_participants** - Participant analysis with meeting history
-8. **get_statistics** - Generate analytics (summary, frequency, duration, patterns)
+8. **get_statistics** - Generate analytics (summary, frequency, duration,patterns)
 9. **export_meeting** - Export meetings in markdown format
 10. **analyze_patterns** - Analyze meeting patterns and trends
 
