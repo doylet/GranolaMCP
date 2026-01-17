@@ -1,4 +1,4 @@
-"""
+""" 
 List command implementation for GranolaMCP CLI.
 
 Provides functionality to list meetings with various filtering options
@@ -75,10 +75,27 @@ class ListCommand:
             help='Filter meetings by participant email/name'
         )
 
-        parser.add_argument(
+        # Folder filtering options
+        folder_group = parser.add_mutually_exclusive_group()
+
+        folder_group.add_argument(
             '--folder',
             type=str,
-            help='Filter meetings by folder/list name (case-insensitive)'
+            help='Filter meetings by folder/list name containing keyword(s) (case-insensitive)'
+        )
+
+        folder_group.add_argument(
+            '--folder-contains',
+            dest='folder_contains',
+            type=str,
+            help='Filter meetings by folder/list name containing keyword(s) (case-insensitive; comma-separated supported)'
+        )
+
+        folder_group.add_argument(
+            '--folder-exact',
+            dest='folder_exact',
+            type=str,
+            help='Filter meetings by exact folder/list name (case-insensitive)'
         )
 
         # Sorting options
@@ -209,15 +226,38 @@ class ListCommand:
         Returns:
             List[Meeting]: Filtered meetings
         """
-        if not self.args.folder:
+        folder_exact = getattr(self.args, 'folder_exact', None)
+        folder_contains = getattr(self.args, 'folder_contains', None)
+        legacy_folder = getattr(self.args, 'folder', None)
+
+        if folder_contains is None and legacy_folder is not None:
+            folder_contains = legacy_folder
+
+        if not folder_exact and not folder_contains:
             return meetings
 
-        search_term = self.args.folder.lower()
-        filtered_meetings = []
+        filtered_meetings: List[Meeting] = []
+
+        if folder_exact:
+            target = folder_exact.lower().strip()
+            for meeting in meetings:
+                folder_name = (meeting.folder_name or "").lower()
+                if folder_name == target:
+                    filtered_meetings.append(meeting)
+            return filtered_meetings
+
+        raw = (folder_contains or "").strip()
+        if not raw:
+            return meetings
+
+        if ',' in raw:
+            keywords = [k.strip().lower() for k in raw.split(',') if k.strip()]
+        else:
+            keywords = [raw.lower()]
 
         for meeting in meetings:
-            folder_name = meeting.folder_name or ""
-            if search_term in folder_name.lower():
+            folder_name = (meeting.folder_name or "").lower()
+            if folder_name and all(keyword in folder_name for keyword in keywords):
                 filtered_meetings.append(meeting)
 
         return filtered_meetings
