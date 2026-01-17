@@ -104,6 +104,12 @@ class ExportCommand:
             help='Override meeting title in export'
         )
 
+        parser.add_argument(
+            '--no-remote',
+            action='store_true',
+            help='Do not fetch transcripts remotely (only use cached/local transcript data)'
+        )
+
     def _find_meeting(self, meeting_id: str) -> Optional[Meeting]:
         """
         Find a meeting by ID.
@@ -116,14 +122,14 @@ class ExportCommand:
         """
         meeting_data = self.parser.get_meeting_by_id(meeting_id)
         if meeting_data:
-            return Meeting(meeting_data)
+            return Meeting(meeting_data).set_remote_fetch_enabled(not self.args.no_remote)
 
         # Try partial ID match
         all_meetings = self.parser.get_meetings()
         for data in all_meetings:
             meeting = Meeting(data)
             if meeting.id and meeting.id.startswith(meeting_id):
-                return meeting
+                return meeting.set_remote_fetch_enabled(not self.args.no_remote)
 
         return None
 
@@ -142,7 +148,7 @@ class ExportCommand:
             # Create a copy of the meeting data with custom title
             meeting_data = meeting.raw_data.copy()
             meeting_data['title'] = self.args.title
-            meeting = Meeting(meeting_data)
+            meeting = Meeting(meeting_data).set_remote_fetch_enabled(not self.args.no_remote)
 
         # Determine what to include
         include_transcript = not self.args.no_transcript

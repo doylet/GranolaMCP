@@ -185,8 +185,9 @@ def format_transcript_section(meeting: Meeting, include_speakers: bool = True,
     Returns:
         str: Formatted markdown transcript section
     """
+    meeting.ensure_transcript(fetch_remote=True)
     transcript = meeting.transcript
-    if not transcript:
+    if transcript is None:
         return ""
 
     lines = []

@@ -6,9 +6,24 @@ Granola.ai meeting objects.
 """
 
 import datetime
+import os
+import re
 from typing import Dict, Any, List, Optional
 from .timezone_utils import convert_utc_to_cst
 from .transcript import Transcript
+from .remote_api import GranolaAPIClient
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    value = str(value).strip().lower()
+    if value in {"1", "true", "yes", "y", "on"}:
+        return True
+    if value in {"0", "false", "no", "n", "off"}:
+        return False
+    return default
 
 
 class Meeting:
@@ -25,6 +40,15 @@ class Meeting:
         """
         self._data = meeting_data
         self._transcript: Optional[Transcript] = None
+        self._remote_transcript_attempted: bool = False
+        # Remote transcript fetching is enabled by default so all CLI/MCP methods can
+        # resolve transcripts even when the local cache is missing chunks.
+        # Opt out with env var GRANOLA_FETCH_REMOTE_TRANSCRIPTS=0 or per-command flags.
+        self._remote_fetch_enabled: bool = _env_bool("GRANOLA_FETCH_REMOTE_TRANSCRIPTS", True)
+
+    def set_remote_fetch_enabled(self, enabled: bool) -> "Meeting":
+        self._remote_fetch_enabled = bool(enabled)
+        return self
 
     @property
     def id(self) -> Optional[str]:
@@ -251,24 +275,109 @@ class Meeting:
     @property
     def transcript(self) -> Optional[Transcript]:
         """Get the meeting transcript."""
-        if self._transcript is None:
-            # Try to find transcript data
-            transcript_data = None
+        self._resolve_cached_transcript()
 
-            # Check for transcript_data field added by parser
-            if 'transcript_data' in self._data:
-                transcript_data = self._data['transcript_data']
-            else:
-                # Fallback to other possible transcript fields
-                for transcript_field in ['transcript', 'transcription', 'content', 'text']:
-                    if transcript_field in self._data:
-                        transcript_data = self._data[transcript_field]
-                        break
-
-            if transcript_data:
-                self._transcript = Transcript(transcript_data)
+        # If transcript is still missing and remote fetch is enabled, try to fetch.
+        if self._transcript is None and self._remote_fetch_enabled:
+            self.ensure_transcript(fetch_remote=True)
 
         return self._transcript
+
+    def _resolve_cached_transcript(self) -> Optional[Transcript]:
+        """Resolve transcript from cached/local meeting payload only (no network)."""
+        if self._transcript is not None:
+            return self._transcript
+
+        transcript_data = None
+
+        # Check for transcript_data field added by parser
+        if 'transcript_data' in self._data:
+            transcript_data = self._data['transcript_data']
+        else:
+            # Fallback to other possible transcript fields
+            for transcript_field in ['transcript', 'transcription', 'content', 'text']:
+                if transcript_field in self._data:
+                    transcript_data = self._data[transcript_field]
+                    break
+
+        # Important: Granola caches can include an explicit transcript entry that is an
+        # empty list (e.g. transcript exists but segments are not yet present). Treat
+        # "present but empty" as a valid transcript payload.
+        if transcript_data is not None:
+            self._transcript = Transcript(transcript_data)
+
+        return self._transcript
+
+    def ensure_transcript(self, fetch_remote: Optional[bool] = True) -> Optional[Transcript]:
+        """Ensure a transcript is available, fetching remotely when needed.
+
+        This is best-effort and safe to call repeatedly. It will not raise on
+        remote failures; instead it will leave transcript unset.
+
+        Args:
+            fetch_remote: If True, attempt remote fetch when transcript is not cached.
+
+        Returns:
+            Optional[Transcript]: The resolved transcript (cached or fetched), or None.
+        """
+
+        # First, try cached/local transcript resolution.
+        if self._resolve_cached_transcript() is not None:
+            return self._transcript
+
+        if fetch_remote is None:
+            fetch_remote = self._remote_fetch_enabled
+
+        if not fetch_remote:
+            return None
+
+        if self._remote_transcript_attempted:
+            return self._transcript
+
+        self._remote_transcript_attempted = True
+
+        # Prefer the document id, but fall back to transcript share URL id if needed.
+        document_id = self.id
+        if not document_id:
+            url = self.transcript_url
+            if isinstance(url, str) and url.strip():
+                m = re.search(r"https?://notes\.granola\.ai/t/(?P<id>[A-Za-z0-9\-]+)", url)
+                if m:
+                    document_id = m.group("id")
+
+        if not document_id:
+            return None
+
+        try:
+            workspace_id = None
+            if isinstance(self._data, dict):
+                workspace_id = self._data.get("workspace_id") or self._data.get("workspaceId")
+            client = GranolaAPIClient.from_local_app_data(workspace_id=workspace_id)
+            payload = client.get_document_transcript(document_id)
+        except Exception:
+            return None
+
+        if payload is None:
+            return None
+
+        # Cache the fetched payload on this meeting instance.
+        self._data["transcript_data"] = payload
+        self._transcript = Transcript(payload)
+        return self._transcript
+
+    def has_transcript(self, fetch_remote: Optional[bool] = None) -> bool:
+        """Return True if a transcript is available.
+
+        When remote fetching is enabled, this will best-effort fetch missing transcripts
+        from the Granola backend so all CLI/MCP commands get consistent results.
+        """
+        if fetch_remote is None:
+            fetch_remote = self._remote_fetch_enabled
+        if fetch_remote:
+            self.ensure_transcript(fetch_remote=True)
+        else:
+            self._resolve_cached_transcript()
+        return self._transcript is not None
 
     def _extract_text_from_structured_content(self, content_list: List[Dict]) -> str:
         """Extract plain text from Granola's structured content format."""
@@ -410,9 +519,28 @@ class Meeting:
         """
         return self._data.get(field_name, default)
 
-    def has_transcript(self) -> bool:
-        """Check if the meeting has transcript data."""
-        return self.transcript is not None
+    @property
+    def transcript_url(self) -> Optional[str]:
+        """Best-effort transcript share URL (when transcript text isn't cached locally)."""
+        if not self._data:
+            return None
+
+        haystacks: List[str] = []
+        for key in ('ai_summary_html', 'notes_markdown', 'notes_plain'):
+            value = self._data.get(key)
+            if isinstance(value, str) and value.strip():
+                haystacks.append(value)
+
+        if not haystacks:
+            return None
+
+        combined = "\n".join(haystacks)
+        match = re.search(r"https?://notes\.granola\.ai/t/[A-Za-z0-9\-]+", combined)
+        return match.group(0) if match else None
+
+    def has_transcript_link(self) -> bool:
+        """Check if the meeting likely has a transcript link (even if not cached)."""
+        return self.transcript_url is not None
 
     def is_in_date_range(self, start_date: datetime.datetime, end_date: datetime.datetime) -> bool:
         """

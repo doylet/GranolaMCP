@@ -115,6 +115,18 @@ class ListCommand:
             help='Hide table header'
         )
 
+        parser.add_argument(
+            '--fetch-transcripts',
+            action='store_true',
+            help='Fetch transcripts remotely when they are not cached locally (may be slow)'
+        )
+
+        parser.add_argument(
+            '--no-remote',
+            action='store_true',
+            help='Do not fetch transcripts remotely (only use cached/local transcript data)'
+        )
+
     def _filter_meetings_by_date(self, meetings: List[Meeting]) -> List[Meeting]:
         """
         Filter meetings by date criteria.
@@ -352,6 +364,11 @@ class ListCommand:
                         transcript_str = f"{word_count // 1000:.1f}k"
                     else:
                         transcript_str = str(word_count)
+                else:
+                    # Surface "present but empty" transcripts
+                    transcript_str = muted("0")
+            elif meeting.has_transcript_link():
+                transcript_str = muted("link")
 
             # Get AI summary word count
             summary_str = muted("--")
@@ -457,7 +474,8 @@ class ListCommand:
             # Load meetings with debug flag if verbose is enabled
             debug_flag = getattr(self.args, 'verbose', False)
             meeting_data = self.parser.get_meetings(debug=debug_flag)
-            meetings = [Meeting(data) for data in meeting_data]
+            remote_enabled = not getattr(self.args, 'no_remote', False)
+            meetings = [Meeting(data).set_remote_fetch_enabled(remote_enabled) for data in meeting_data]
 
             if self.args.verbose:
                 print_info(f"Loaded {len(meetings)} meetings from cache")
@@ -474,6 +492,22 @@ class ListCommand:
             # Apply limit
             if self.args.limit and self.args.limit > 0:
                 meetings = meetings[:self.args.limit]
+
+            # Resolve transcripts remotely for the meetings we're about to display.
+            # Default is enabled (Meeting default/env); explicit opt-out is --no-remote.
+            # --fetch-transcripts acts as a force-enable switch.
+            if getattr(self.args, 'fetch_transcripts', False):
+                remote_enabled = True
+
+            if remote_enabled:
+                if self.args.verbose:
+                    print_info(f"Fetching remote transcripts for {len(meetings)} meetings (best-effort)...")
+                for meeting in meetings:
+                    try:
+                        meeting.ensure_transcript(fetch_remote=True)
+                    except Exception:
+                        # Best-effort: keep listing even if a remote fetch fails.
+                        pass
 
             # Format output
             if self.args.format == 'simple':

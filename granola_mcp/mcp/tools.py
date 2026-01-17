@@ -152,8 +152,9 @@ class MCPTools:
                 continue
 
             # Search in transcript
-            if meeting.has_transcript() and meeting.transcript:
-                if query_lower in meeting.transcript.full_text.lower():
+            if meeting.has_transcript():
+                transcript = meeting.transcript
+                if transcript is not None and query_lower in transcript.full_text.lower():
                     matching_meetings.append(meeting)
                     continue
 
@@ -333,8 +334,11 @@ class MCPTools:
             }
 
             # Add transcript info if available
-            if meeting.has_transcript() and meeting.transcript:
+            if meeting.has_transcript():
                 transcript = meeting.transcript
+                if transcript is None:
+                    # Defensive: has_transcript() should imply transcript is not None
+                    return result
                 result["transcript_info"] = {
                     "word_count": transcript.word_count,
                     "speakers": transcript.speakers,
@@ -380,7 +384,7 @@ class MCPTools:
                 raise MCPToolError(f"Meeting has no transcript: {meeting_id}")
 
             transcript = meeting.transcript
-            if not transcript:
+            if transcript is None:
                 raise MCPToolError(f"Meeting transcript is None: {meeting_id}")
 
             # Build transcript response
@@ -454,7 +458,7 @@ class MCPTools:
             }
 
             # Add transcript summary if available
-            if meeting.has_transcript() and meeting.transcript:
+            if meeting.has_transcript() and meeting.transcript is not None:
                 transcript = meeting.transcript
 
                 # Basic transcript analysis
@@ -783,6 +787,11 @@ class MCPTools:
             if not meeting:
                 raise MCPToolError(f"Meeting not found: {meeting_id}")
 
+            # Force-load transcript if include_transcript is True
+            # This ensures transcript is available even if has_transcript() returns False
+            if include_transcript:
+                meeting.ensure_transcript(fetch_remote=True)
+                _ = meeting.transcript  # Force property access to load transcript
             # Use the existing markdown export function
             markdown_content = export_meeting_to_markdown(
                 meeting,

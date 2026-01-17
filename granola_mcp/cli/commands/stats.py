@@ -143,6 +143,12 @@ class StatsCommand:
             help='Width for ASCII charts'
         )
 
+        parser.add_argument(
+            '--no-remote',
+            action='store_true',
+            help='Do not fetch transcripts remotely (only use cached/local transcript data)'
+        )
+
     def _filter_meetings_by_date(self, meetings: List[Meeting]) -> List[Meeting]:
         """
         Filter meetings by date criteria.
@@ -534,7 +540,7 @@ class StatsCommand:
         total_words = 0
 
         for meeting in meetings:
-            if meeting.has_transcript() and meeting.transcript:
+            if meeting.has_transcript() and meeting.transcript is not None:
                 meetings_with_transcripts += 1
                 # Simple word count (split by whitespace)
                 transcript_text = meeting.transcript.full_text
@@ -637,7 +643,8 @@ class StatsCommand:
         try:
             # Load meetings
             meeting_data = self.parser.get_meetings()
-            meetings = [Meeting(data) for data in meeting_data]
+            remote_enabled = not getattr(self.args, 'no_remote', False)
+            meetings = [Meeting(data).set_remote_fetch_enabled(remote_enabled) for data in meeting_data]
 
             if self.args.verbose:
                 print_info(f"Loaded {len(meetings)} meetings from cache")

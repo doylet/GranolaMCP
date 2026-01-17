@@ -87,6 +87,12 @@ class CollectCommand:
             help='Minimum words required to include a segment (default: 1)'
         )
 
+        parser.add_argument(
+            '--no-remote',
+            action='store_true',
+            help='Do not fetch transcripts remotely (only use cached/local transcript data)'
+        )
+
     def _get_date_range(self) -> Tuple[Optional[datetime], Optional[datetime]]:
         """
         Get the date range for collection.
@@ -150,7 +156,7 @@ class CollectCommand:
         
         for meeting in meetings:
             transcript = meeting.transcript
-            if not transcript:
+            if transcript is None:
                 continue
                 
             # Get my words from this meeting
@@ -242,8 +248,9 @@ class CollectCommand:
 
             # Get meetings in date range
             meetings = []
+            remote_enabled = not getattr(self.args, 'no_remote', False)
             for meeting_data in self.parser.get_meetings():
-                meeting = Meeting(meeting_data)
+                meeting = Meeting(meeting_data).set_remote_fetch_enabled(remote_enabled)
                 if meeting.start_time and start_date <= meeting.start_time <= end_date:
                     meetings.append(meeting)
 

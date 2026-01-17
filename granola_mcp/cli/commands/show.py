@@ -74,6 +74,12 @@ class ShowCommand:
             help='Show all available information (equivalent to --transcript --notes --summary --metadata)'
         )
 
+        parser.add_argument(
+            '--no-remote',
+            action='store_true',
+            help='Do not fetch transcript remotely when it is not cached locally'
+        )
+
         # Transcript formatting options
         parser.add_argument(
             '--no-speakers',
@@ -105,14 +111,14 @@ class ShowCommand:
         """
         meeting_data = self.parser.get_meeting_by_id(meeting_id)
         if meeting_data:
-            return Meeting(meeting_data)
+            return Meeting(meeting_data).set_remote_fetch_enabled(not self.args.no_remote)
 
         # Try partial ID match
         all_meetings = self.parser.get_meetings()
         for data in all_meetings:
             meeting = Meeting(data)
             if meeting.id and meeting.id.startswith(meeting_id):
-                return meeting
+                return meeting.set_remote_fetch_enabled(not self.args.no_remote)
 
         return None
 
@@ -151,8 +157,10 @@ class ShowCommand:
         if participants:
             details.append(("Participants", f"{len(participants)} attendees"))
 
-        if meeting.has_transcript():
+        if meeting.has_transcript(fetch_remote=not self.args.no_remote):
             details.append(("Transcript", "Available"))
+        elif meeting.has_transcript_link():
+            details.append(("Transcript", "Linked"))
         else:
             details.append(("Transcript", muted("Not available")))
 
@@ -263,9 +271,16 @@ class ShowCommand:
         Args:
             meeting: Meeting to display
         """
+        # Best-effort: fetch remotely when not cached.
+        meeting.ensure_transcript(fetch_remote=not self.args.no_remote)
         transcript = meeting.transcript
-        if not transcript:
-            print_info("No transcript available for this meeting.")
+        if transcript is None:
+            transcript_url = meeting.transcript_url
+            if transcript_url:
+                print_info("Transcript is not cached locally for this meeting.")
+                print_info(f"Open: {transcript_url}")
+            else:
+                print_info("No transcript available for this meeting.")
             return
 
         print_section("Transcript")
@@ -335,6 +350,10 @@ class ShowCommand:
             show_notes = self.args.notes or self.args.all
             show_summary = self.args.summary or self.args.all
             show_metadata = self.args.metadata or self.args.all
+
+            # If the user asked for transcript output, try to resolve it (including remote).
+            if show_transcript:
+                meeting.ensure_transcript(fetch_remote=not self.args.no_remote)
 
             # Show basic information
             self._show_basic_info(meeting)
