@@ -69,7 +69,7 @@ GranolaMCP provides complete access to Granola.ai meeting data through multiple 
 
 ```bash
 # Install from source
-git clone https://github.com/pedramamini/GranolaMCP.git
+git clone https://github.com/thomasdoyleamini/GranolaMCP.git
 cd GranolaMCP
 pip install -e .
 
@@ -90,7 +90,7 @@ cp .env.example .env
 Edit `.env` to set your Granola cache file path:
 
 ```env
-GRANOLA_CACHE_PATH=/Users/pedram/Library/Application Support/Granola/cache-v3.json
+GRANOLA_CACHE_PATH=/Users/thomasdoyle/Library/Application Support/Granola/cache-v3.json
 ```
 
 ### 2. Basic Usage
@@ -167,6 +167,15 @@ python -m granola_mcp list --last 7d
 
 # Filter by folder (OPSWAT, Mozilla, Personal, etc.)
 python -m granola_mcp list --folder Mozilla --limit 10
+
+# Filter by folder name containing keyword(s)
+python -m granola_mcp list --folder-contains "Atlassian" --limit 10
+
+# Filter by folder name containing multiple keywords (comma-separated; all must match)
+python -m granola_mcp list --folder-contains "engineering,planning" --limit 10
+
+# Filter by exact folder name (case-insensitive)
+python -m granola_mcp list --folder-exact "Mozilla" --limit 10
 
 # Search meetings by title
 python -m granola_mcp list --title-contains "standup" --folder OPSWAT
@@ -420,8 +429,8 @@ MIT License - see LICENSE file for details.
 
 ## Architecture
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture documentation.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture documentation.
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for development roadmap and future plans.
+See [docs/ROADMAP.md](docs/ROADMAP.md) for development roadmap and future plans.
