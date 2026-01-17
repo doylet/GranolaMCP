@@ -135,6 +135,70 @@ class GranolaParser:
         if debug:
             print(f"DEBUG: Found {len(transcripts)} transcripts")
 
+        def _normalize_id(value: Any) -> Optional[str]:
+            if value is None:
+                return None
+            if not isinstance(value, str):
+                try:
+                    value = str(value)
+                except Exception:
+                    return None
+            normalized = value.strip().lower().replace('-', '')
+            return normalized or None
+
+        def _build_transcript_by_document_id(transcripts_container: Any) -> Dict[str, Any]:
+            """Build a mapping of document_id -> transcript payload.
+
+            Granola caches generally store `state['transcripts']` as a dict keyed by document_id,
+            but in practice keys can differ (e.g., transcript UUIDs) or document IDs may differ
+            only by dash formatting. Prefer segment-level `document_id` when present.
+            """
+            by_doc_id: Dict[str, Any] = {}
+
+            if isinstance(transcripts_container, dict):
+                items = transcripts_container.items()
+            elif isinstance(transcripts_container, list):
+                items = [(None, item) for item in transcripts_container]
+            else:
+                return by_doc_id
+
+            for container_key, transcript_value in items:
+                # Common case: transcript is a list of segment dicts
+                if isinstance(transcript_value, list):
+                    # If segments declare document_id, map by that
+                    doc_ids_in_segments = []
+                    for seg in transcript_value:
+                        if isinstance(seg, dict) and 'document_id' in seg:
+                            doc_id = seg.get('document_id')
+                            if isinstance(doc_id, str) and doc_id:
+                                doc_ids_in_segments.append(doc_id)
+
+                    if doc_ids_in_segments:
+                        primary_doc_id = doc_ids_in_segments[0]
+                        if primary_doc_id not in by_doc_id:
+                            by_doc_id[primary_doc_id] = transcript_value
+                        continue
+
+                    # Otherwise, fall back to the container key as document id
+                    if isinstance(container_key, str) and container_key:
+                        if container_key not in by_doc_id:
+                            by_doc_id[container_key] = transcript_value
+                    continue
+
+                # Less common: transcript stored as dict or string
+                if isinstance(container_key, str) and container_key:
+                    if container_key not in by_doc_id:
+                        by_doc_id[container_key] = transcript_value
+
+            return by_doc_id
+
+        transcript_by_doc_id = _build_transcript_by_document_id(transcripts)
+        transcript_by_doc_id_normalized = {
+            _normalize_id(doc_id): payload
+            for doc_id, payload in transcript_by_doc_id.items()
+            if _normalize_id(doc_id) is not None
+        }
+
         # Get document panels (contains structured notes)
         document_panels = state_data.get('documentPanels', {})
         if debug:
@@ -162,7 +226,7 @@ class GranolaParser:
         for doc_id, doc_data in documents.items():
             # Start with document data
             meeting = doc_data.copy()
-            
+
             # Add metadata if available
             if doc_id in meetings_metadata:
                 meta = meetings_metadata[doc_id]
@@ -172,13 +236,34 @@ class GranolaParser:
                         meeting[key] = value
 
             # Add transcript if available
-            if doc_id in transcripts:
-                meeting['transcript_data'] = transcripts[doc_id]
+            transcript_payload = None
+
+            # 1) Direct match
+            if doc_id in transcript_by_doc_id:
+                transcript_payload = transcript_by_doc_id[doc_id]
+            else:
+                # 2) Match by normalized id (handles dashed vs undashed UUIDs)
+                normalized_doc_id = _normalize_id(doc_id)
+                if normalized_doc_id and normalized_doc_id in transcript_by_doc_id_normalized:
+                    transcript_payload = transcript_by_doc_id_normalized[normalized_doc_id]
+                else:
+                    # 3) Try matching by meeting's internal id field (sometimes differs from dict key)
+                    meeting_id_value = meeting.get('id') if isinstance(meeting, dict) else None
+                    if isinstance(meeting_id_value, str) and meeting_id_value:
+                        if meeting_id_value in transcript_by_doc_id:
+                            transcript_payload = transcript_by_doc_id[meeting_id_value]
+                        else:
+                            normalized_meeting_id = _normalize_id(meeting_id_value)
+                            if normalized_meeting_id and normalized_meeting_id in transcript_by_doc_id_normalized:
+                                transcript_payload = transcript_by_doc_id_normalized[normalized_meeting_id]
+
+            if transcript_payload is not None:
+                meeting['transcript_data'] = transcript_payload
 
             # Add document panels content (AI summaries and structured notes)
             if doc_id in document_panels:
                 panels = document_panels[doc_id]
-                
+
                 # Extract AI summaries from original_content (HTML format)
                 ai_summaries = []
                 for panel_id, panel_data in panels.items():
@@ -187,11 +272,11 @@ class GranolaParser:
                         # Skip panels that are just links
                         if not original_content.strip().startswith('<hr>'):
                             ai_summaries.append(original_content)
-                
+
                 if ai_summaries:
                     # Combine all AI summaries into one
                     meeting['ai_summary_html'] = '\n\n'.join(ai_summaries)
-                
+
                 # Look for the first panel with structured content (for fallback)
                 for panel_id, panel_data in panels.items():
                     panel_content = panel_data.get('content')
