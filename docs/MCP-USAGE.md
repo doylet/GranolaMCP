@@ -2,7 +2,7 @@
 
 This guide provides comprehensive instructions for manually running the GranolaMCP MCP (Model Context Protocol) server, configuring it, testing it, and integrating it with LLM systems.
 
-**Data Source Note**: The MCP server operates exclusively on Granola's local cache file (`cache-v3.json`) and does not make any network requests to Granola's API. This ensures privacy, performance, and offline operation. While API-based access would be technically possible using credentials from Granola's `supabase.json` file, this implementation focuses on the cache-based approach.
+**Data Source Note**: The MCP server operates exclusively on Granola's local cache file (`cache-v6.json`) and does not make any network requests to Granola's API. This ensures privacy, performance, and offline operation. While API-based access would be technically possible using credentials from Granola's `supabase.json` file, this implementation focuses on the cache-based approach.
 
 ## Table of Contents
 
@@ -19,7 +19,7 @@ This guide provides comprehensive instructions for manually running the GranolaM
 
 - Python 3.12 or higher
 - GranolaMCP installed (`pip install -e .` from the project root)
-- Access to a Granola cache file (typically located at `~/Library/Application Support/Granola/cache-v3.json` on macOS)
+- Access to a Granola cache file (typically located at `~/Library/Application Support/Granola/cache-v6.json` on macOS)
 
 ### Starting the Server
 
@@ -71,7 +71,7 @@ The server can be configured using environment variables or a `.env` file:
 
 ```bash
 # Set cache path
-export GRANOLA_CACHE_PATH="/Users/pedram/Library/Application Support/Granola/cache-v3.json"
+export GRANOLA_CACHE_PATH="/Users/pedram/Library/Application Support/Granola/cache-v6.json"
 
 # Set timezone (optional)
 export GRANOLA_TIMEZONE="America/Chicago"
@@ -96,8 +96,8 @@ export GRANOLA_DATE_FORMAT="%Y-%m-%d %H:%M:%S %Z"
    # Copy this file to .env and update the values as needed
 
    # Path to the Granola cache file
-   # Default: /Users/pedram/Library/Application Support/Granola/cache-v3.json
-   GRANOLA_CACHE_PATH=/Users/pedram/Library/Application Support/Granola/cache-v3.json
+   # Default: /Users/pedram/Library/Application Support/Granola/cache-v6.json
+   GRANOLA_CACHE_PATH=/Users/pedram/Library/Application Support/Granola/cache-v6.json
 
    # Optional: Set timezone (default is America/Chicago for CST)
    # GRANOLA_TIMEZONE=America/Chicago
@@ -116,18 +116,18 @@ The server looks for the Granola cache file in this order:
 1. Command-line argument: `--cache-path`
 2. Environment variable: `GRANOLA_CACHE_PATH`
 3. `.env` file: `GRANOLA_CACHE_PATH`
-4. Default location: `~/Library/Application Support/Granola/cache-v3.json`
+4. Default location: `~/Library/Application Support/Granola/cache-v6.json`
 
 **Finding your cache file:**
 ```bash
 # Common locations on macOS
 ls -la ~/Library/Application\ Support/Granola/
-ls -la ~/Library/Application\ Support/Granola/cache-v3.json
+ls -la ~/Library/Application\ Support/Granola/cache-v6.json
 
 # Check if the file exists and is readable
 python -c "
 import os
-cache_path = os.path.expanduser('~/Library/Application Support/Granola/cache-v3.json')
+cache_path = os.path.expanduser('~/Library/Application Support/Granola/cache-v6.json')
 print(f'Cache file exists: {os.path.exists(cache_path)}')
 print(f'Cache file readable: {os.access(cache_path, os.R_OK) if os.path.exists(cache_path) else False}')
 print(f'Cache file size: {os.path.getsize(cache_path) if os.path.exists(cache_path) else 0} bytes')
@@ -217,7 +217,7 @@ To integrate with Claude Desktop, add the server configuration to your Claude De
       "command": "/Users/pedram/venv3-20241001/bin/python",
       "args": ["-m", "granola_mcp.mcp"],
       "env": {
-        "GRANOLA_CACHE_PATH": "/Users/pedram/Library/Application Support/Granola/cache-v3.json"
+        "GRANOLA_CACHE_PATH": "/Users/pedram/Library/Application Support/Granola/cache-v6.json"
       }
     }
   }
@@ -232,7 +232,7 @@ To integrate with Claude Desktop, add the server configuration to your Claude De
       "command": "/Users/pedram/venv3-20241001/bin/python",
       "args": ["-m", "granola_mcp.mcp", "--debug"],
       "env": {
-        "GRANOLA_CACHE_PATH": "/Users/pedram/Library/Application Support/Granola/cache-v3.json"
+        "GRANOLA_CACHE_PATH": "/Users/pedram/Library/Application Support/Granola/cache-v6.json"
       }
     }
   }
@@ -467,9 +467,9 @@ Analyze meeting patterns and trends.
 **Error:** `Failed to initialize server: Invalid cache file structure`
 
 **Solutions:**
-- Verify the cache file path: `ls -la ~/Library/Application\ Support/Granola/cache-v3.json`
+- Verify the cache file path: `ls -la ~/Library/Application\ Support/Granola/cache-v6.json`
 - Check if Granola app is installed and has created meetings
-- Ensure the cache file is readable: `chmod 644 ~/Library/Application\ Support/Granola/cache-v3.json`
+- Ensure the cache file is readable: `chmod 644 ~/Library/Application\ Support/Granola/cache-v6.json`
 - Try specifying the path explicitly: `--cache-path "/full/path/to/cache.json"`
 
 #### 2. Permission Denied
@@ -479,10 +479,10 @@ Analyze meeting patterns and trends.
 **Solutions:**
 ```bash
 # Check file permissions
-ls -la ~/Library/Application\ Support/Granola/cache-v3.json
+ls -la ~/Library/Application\ Support/Granola/cache-v6.json
 
 # Fix permissions if needed
-chmod 644 ~/Library/Application\ Support/Granola/cache-v3.json
+chmod 644 ~/Library/Application\ Support/Granola/cache-v6.json
 
 # Check directory permissions
 ls -la ~/Library/Application\ Support/Granola/
@@ -522,12 +522,12 @@ python -c "import granola_mcp; print(granola_mcp.__version__)"
 **Solutions:**
 ```bash
 # Check cache file content
-head -n 20 ~/Library/Application\ Support/Granola/cache-v3.json
+head -n 20 ~/Library/Application\ Support/Granola/cache-v6.json
 
 # Verify JSON structure
 python -c "
 import json
-with open('/Users/pedram/Library/Application Support/Granola/cache-v3.json') as f:
+with open('/Users/pedram/Library/Application Support/Granola/cache-v6.json') as f:
     data = json.load(f)
     print(f'Cache contains {len(data.get(\"meetings\", []))} meetings')
 "
@@ -626,7 +626,7 @@ python verify_mcp_server.py
       "command": "/Users/pedram/venv3-20241001/bin/python",
       "args": ["-m", "granola_mcp.mcp"],
       "env": {
-        "GRANOLA_CACHE_PATH": "/Users/pedram/Library/Application Support/Granola/cache-v3.json"
+        "GRANOLA_CACHE_PATH": "/Users/pedram/Library/Application Support/Granola/cache-v6.json"
       }
     }
   }

@@ -60,8 +60,8 @@ The codebase follows a modular architecture with three main layers:
 ### Data Source Structure
 Granola cache files require double JSON parsing due to nested structure:
 ```python
-data = json.loads(open("cache-v3.json").read())
-cache = json.loads(data['cache'])
+data = json.loads(open("cache-v6.json").read())
+cache = json.loads(data['cache']) if isinstance(data['cache'], str) else data['cache']
 meetings = cache['state']['documents']
 transcripts = cache['state']['transcripts']
 ```
@@ -69,7 +69,7 @@ transcripts = cache['state']['transcripts']
 ### Configuration
 Uses `.env` file for configuration:
 ```env
-GRANOLA_CACHE_PATH=/Users/pedram/Library/Application Support/Granola/cache-v3.json
+GRANOLA_CACHE_PATH=~/Library/Application Support/Granola/cache-v6.json
 GRANOLA_TIMEZONE=America/Chicago
 ```
 

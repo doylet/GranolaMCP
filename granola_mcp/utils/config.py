@@ -5,8 +5,38 @@ Provides simple .env file parsing and configuration management using
 Python's standard library only (no external dependencies).
 """
 
+import glob
 import os
+import re
 from typing import Dict, Optional
+
+
+def _discover_default_cache_path() -> str:
+    """
+    Discover the best default Granola cache file path for the current user.
+
+    Prefers the highest-version cache-vN.json file when available.
+    Falls back to cache-v3.json for backward compatibility.
+    """
+    granola_dir = os.path.expanduser("~/Library/Application Support/Granola")
+    pattern = os.path.join(granola_dir, "cache-v*.json")
+    candidates = glob.glob(pattern)
+
+    if not candidates:
+        return os.path.join(granola_dir, "cache-v3.json")
+
+    versioned_paths = []
+    for path in candidates:
+        filename = os.path.basename(path)
+        match = re.match(r"cache-v(\d+)\.json$", filename)
+        if match:
+            versioned_paths.append((int(match.group(1)), path))
+
+    if versioned_paths:
+        versioned_paths.sort(key=lambda item: item[0], reverse=True)
+        return versioned_paths[0][1]
+
+    return sorted(candidates)[-1]
 
 
 def parse_env_file(env_path: str) -> Dict[str, str]:
@@ -109,9 +139,7 @@ def get_cache_path(config: Optional[Dict[str, str]] = None) -> str:
         # Expand user home directory if needed
         return os.path.expanduser(cache_path)
 
-    # Default cache path
-    default_path = "/Users/pedram/Library/Application Support/Granola/cache-v3.json"
-    return os.path.expanduser(default_path)
+    return _discover_default_cache_path()
 
 
 def get_config_value(key: str, default: Optional[str] = None, config: Optional[Dict[str, str]] = None) -> Optional[str]:
@@ -157,7 +185,7 @@ def create_example_env(path: str = ".env.example") -> None:
     """
     example_content = '''# GranolaMCP Configuration
 # Path to the Granola cache file
-GRANOLA_CACHE_PATH=/Users/pedram/Library/Application Support/Granola/cache-v3.json
+GRANOLA_CACHE_PATH=~/Library/Application Support/Granola/cache-v6.json
 
 # Optional: Set timezone (default is America/Chicago)
 # GRANOLA_TIMEZONE=America/Chicago

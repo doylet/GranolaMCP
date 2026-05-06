@@ -24,7 +24,7 @@ GranolaMCP provides complete access to Granola.ai meeting data through multiple 
 
 ## Data Source
 
-**GranolaMCP operates entirely on local cache files** - it reads meeting data directly from Granola's local cache file (`cache-v3.json`) without making any API calls to Granola's servers. This approach provides:
+**GranolaMCP operates entirely on local cache files** - it reads meeting data directly from Granola's local cache file (`cache-v6.json`) without making any API calls to Granola's servers. This approach provides:
 
 - **🔌 No Network Dependency** - Works completely offline
 - **⚡ Fast Access** - Direct file system access with no API rate limits  
@@ -90,7 +90,7 @@ cp .env.example .env
 Edit `.env` to set your Granola cache file path:
 
 ```env
-GRANOLA_CACHE_PATH=/Users/pedram/Library/Application Support/Granola/cache-v3.json
+GRANOLA_CACHE_PATH=/Users/pedram/Library/Application Support/Granola/cache-v6.json
 ```
 
 ### 2. Basic Usage
@@ -301,7 +301,7 @@ Add to your `~/Library/Application Support/Claude/claude_desktop_config.json`:
       "command": "python",
       "args": ["-m", "granola_mcp.mcp"],
       "env": {
-        "GRANOLA_CACHE_PATH": "/Users/[username]/Library/Application Support/Granola/cache-v3.json"
+        "GRANOLA_CACHE_PATH": "/Users/[username]/Library/Application Support/Granola/cache-v6.json"
       }
     }
   }

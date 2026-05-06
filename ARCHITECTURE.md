@@ -6,7 +6,7 @@ A Python 3.12+ library providing programmatic, CLI, and MCP access to Granola.ai
 
 ### Data Access Strategy
 
-**GranolaMCP uses a cache-based approach exclusively** - all data is read directly from Granola's local cache file (`cache-v3.json`) without any network communication. This design choice provides:
+**GranolaMCP uses a cache-based approach exclusively** - all data is read directly from Granola's local cache file (`cache-v*.json`, commonly `cache-v6.json`) without any network communication. This design choice provides:
 
 - **Offline Operation**: Complete functionality without internet connectivity
 - **Performance**: Direct file system access eliminates API latency

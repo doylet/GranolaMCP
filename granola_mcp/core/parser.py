@@ -20,9 +20,10 @@ class GranolaParser:
     """
     Parser for Granola.ai cache files.
 
-    Handles the double JSON parsing required for Granola cache files:
-    1. Parse the outer JSON structure
-    2. Parse the inner 'cache' field which contains JSON as a string
+    Handles Granola cache files where the outer JSON includes a `cache` field.
+    The `cache` value may be either:
+    1. A JSON string that requires a second parse (legacy format)
+    2. A JSON object ready to use directly (newer format)
     """
 
     def __init__(self, cache_path: Optional[str] = None):
@@ -75,14 +76,17 @@ class GranolaParser:
                 raise GranolaParseError("Cache file missing required 'cache' field")
 
             cache_content = outer_data['cache']
-            if not isinstance(cache_content, str):
-                raise GranolaParseError("Cache field must contain a JSON string")
 
-            # Second JSON parse - parse the inner cache content
-            try:
-                self._cache_data = json.loads(cache_content)
-            except json.JSONDecodeError as e:
-                raise GranolaParseError(f"Invalid JSON in cache content: {e}") from e
+            # Support both legacy string payloads and newer object payloads.
+            if isinstance(cache_content, str):
+                try:
+                    self._cache_data = json.loads(cache_content)
+                except json.JSONDecodeError as e:
+                    raise GranolaParseError(f"Invalid JSON in cache content: {e}") from e
+            elif isinstance(cache_content, dict):
+                self._cache_data = cache_content
+            else:
+                raise GranolaParseError("Cache field must contain either a JSON string or object")
 
             if not isinstance(self._cache_data, dict):
                 raise GranolaParseError("Cache content must be a JSON object")

@@ -4,14 +4,14 @@ This document provides a comprehensive analysis of the Granola.ai cache JSON str
 
 ## Overview
 
-The Granola.ai cache file (`cache-v3.json`) contains a nested JSON structure with the main data stored under a `cache` key that itself contains a JSON string requiring double parsing.
+The Granola.ai cache file (`cache-v*.json`, commonly `cache-v6.json`) contains a nested JSON structure with the main data stored under a `cache` key. Depending on Granola version, `cache` may be either a JSON string (legacy) or a JSON object (current).
 
 **Important**: GranolaMCP operates exclusively on this local cache file and does not communicate with Granola's API servers. While it would be possible to extract authentication credentials from Granola's `supabase.json` configuration and make direct API calls, this library intentionally uses the cache-based approach for better performance, privacy, and offline operation.
 
 ```python
 # Loading pattern
-data = json.loads(open("cache-v3.json").read())
-cache = json.loads(data['cache'])
+data = json.loads(open("cache-v6.json").read())
+cache = json.loads(data['cache']) if isinstance(data['cache'], str) else data['cache']
 ```
 
 ## Top-Level Structure
